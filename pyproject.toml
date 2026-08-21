@@ -1,0 +1,35 @@
+[project]
+name = "edge-ai-provider"
+version = "0.1.0"
+description = "EdgeAI Micro-Provider — OpenAI-compatible API for edge AI models"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "sse-starlette>=2.0",
+    "llama-cpp-python>=0.3",
+    "cactus-needle>=0.1",
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx",
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
