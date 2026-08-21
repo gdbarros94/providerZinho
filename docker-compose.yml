@@ -1,0 +1,33 @@
+services:
+  edge-ai-provider:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: edge_ai_provider
+    restart: unless-stopped
+    ports:
+      - "${PORT:-9880}:9880"
+    environment:
+      - PORT=9880
+      - HOST=0.0.0.0
+      - MODELS_DIR=/app/models
+      - API_KEY=${API_KEY:-sk-edge-dev-local}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_RAM_PERCENT=${MAX_RAM_PERCENT:-85}
+      - MAX_CPU_PERCENT=${MAX_CPU_PERCENT:-90}
+      - MAX_CONCURRENT_INFERENCES=${MAX_CONCURRENT_INFERENCES:-2}
+      - GPU_MODE=${GPU_MODE:-auto}
+      - DEFAULT_TEXT_MODELS=${DEFAULT_TEXT_MODELS:-}
+      - NEEDLE_ENABLED=${NEEDLE_ENABLED:-true}
+    volumes:
+      # Mapeia a pasta local de modelos para dentro do container
+      - ./models:/app/models
+    # Configuração opcional para GPU NVIDIA (caso disponível no host)
+    # Para ativar o suporte à GPU no Docker, descomente o bloco abaixo:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
