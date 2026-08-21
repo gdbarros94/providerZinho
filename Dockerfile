@@ -19,15 +19,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Set working directory
 WORKDIR /app
 
-# Copy dependency specifications first for Docker caching
+# Copy dependency specifications and application source
 COPY pyproject.toml /app/
+COPY edge_ai_provider /app/edge_ai_provider
 
-# Install Python dependencies
+# Install Python dependencies and package
 RUN pip install --no-cache-dir --upgrade pip setuptools \
     && pip install --no-cache-dir .
-
-# Copy application source code
-COPY edge_ai_provider /app/edge_ai_provider
 
 # Create volume mount directory for GGUF models
 RUN mkdir -p /app/models
