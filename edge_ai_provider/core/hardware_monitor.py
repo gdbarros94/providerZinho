@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import psutil
+from edge_ai_provider.core.thermal import get_thermal_provider
 
 if TYPE_CHECKING:
     from edge_ai_provider.core.config import Settings
