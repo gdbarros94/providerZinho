@@ -122,9 +122,9 @@ async def _register_models(
     # Mapping based on RFC v2
     slm_configs = [
         {"id": "qwen-0.5b", "file": "qwen2.5-0.5b-instruct-q6_k.gguf", "ctx": 32768, "t": 4},
-        {"id": "gemma-2b", "file": "gemma-2-2b-it-q4_k_m.gguf", "ctx": 8192, "t": 4},
-        {"id": "llama-3.2-3b", "file": "llama-3.2-3b-instruct-iq3_m.gguf", "ctx": 8192, "t": 6},
-        {"id": "phi-3.5-mini", "file": "phi-3.5-mini-instruct-q4_k_m.gguf", "ctx": 8192, "t": 6},
+        {"id": "gemma-2b", "file": "gemma-2-2b-it-Q4_K_M.gguf", "ctx": 8192, "t": 4},
+        {"id": "llama-3.2-3b", "file": "Llama-3.2-3B-Instruct-IQ3_M.gguf", "ctx": 8192, "t": 6},
+        {"id": "phi-3.5-mini", "file": "Phi-3.5-mini-instruct-Q4_K_M.gguf", "ctx": 8192, "t": 6},
     ]
 
     for cfg in slm_configs:
