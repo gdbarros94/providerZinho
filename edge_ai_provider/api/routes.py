@@ -83,8 +83,6 @@ async def chat_completions(
             return await _handle_non_streaming(modified_request, adapter)
 
     except HTTPException:
-
-    except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Unexpected error in chat_completions")
