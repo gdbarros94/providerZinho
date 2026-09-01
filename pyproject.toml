@@ -12,6 +12,7 @@ dependencies = [
     "llama-cpp-python>=0.3",
     "cactus-needle>=0.1",
     "psutil>=5.9",
+    "tiktoken>=0.7.0",
 ]
 
 [project.optional-dependencies]
