@@ -22,7 +22,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from edge_ai_provider.api.routes import router
 from edge_ai_provider.core.config import Settings, get_settings
 from edge_ai_provider.core.hardware_monitor import init_hardware_monitor
+from edge_ai_provider.core.thermal import get_thermal_provider
+from edge_ai_provider.core.router import AgenticRouter
 from edge_ai_provider.models.registry import get_registry
+from edge_ai_provider.utils.payload_processor import PayloadProcessor
 
 logger = logging.getLogger("edge_ai_provider")
 
@@ -36,6 +39,19 @@ logger = logging.getLogger("edge_ai_provider")
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan: load models on startup, unload on shutdown."""
     settings = get_settings()
+
+    # Init Payload Processor
+    processor = PayloadProcessor()
+    app.state.payload_processor = processor
+
+    # Init Hardware Monitor
+    hw = init_hardware_monitor(settings)
+    app.state.hw_monitor = hw
+
+    # Init Agentic Router
+    registry = get_registry()
+    router = AgenticRouter(registry, hw)
+    app.state.router = router
 
     # ── Configure logging ───────────────────────────────────────────────
     logging.basicConfig(
@@ -87,6 +103,7 @@ async def _register_models(
     """Register all configured model adapters."""
     from edge_ai_provider.models.needle_adapter import NeedleAdapter
     from edge_ai_provider.models.text_adapter import TextModelAdapter
+    from edge_ai_provider.models.llama_cpp_adapter import LlamaCPPAdapter
     from edge_ai_provider.utils.gpu_detector import detect_gpu_layers
 
     # ── Needle 2 ────────────────────────────────────────────────────────
@@ -98,65 +115,40 @@ async def _register_models(
     # ── Text models from MODELS_DIR ─────────────────────────────────────
     models_dir = settings.models_dir
     if not models_dir.exists():
-        models_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("Created models directory: %s", models_dir)
+        logger.warning("Models directory %s not found", models_dir)
+        return
 
-    # Explicitly configured models (alias:filename pairs)
-    configured = settings.parse_default_text_models()
+    # ── SLM Fleet Registration ──────────────────────────────────────────
+    # Mapping based on RFC v2
+    slm_configs = [
+        {"id": "qwen-0.5b", "file": "qwen2.5-0.5b-instruct-q6_k.gguf", "ctx": 32768, "t": 4},
+        {"id": "gemma-2b", "file": "gemma-2-2b-it-q4_k_m.gguf", "ctx": 8192, "t": 4},
+        {"id": "llama-3.2-3b", "file": "llama-3.2-3b-instruct-iq3_m.gguf", "ctx": 8192, "t": 6},
+        {"id": "phi-3.5-mini", "file": "phi-3.5-mini-instruct-q4_k_m.gguf", "ctx": 8192, "t": 6},
+    ]
 
-    # Auto-discover any .gguf files not already configured
-    gguf_files = list(models_dir.glob("*.gguf"))
-    for gguf_path in gguf_files:
-        # Check if this file is already in the configured map
-        stem = gguf_path.stem
-        if stem not in configured and gguf_path.name not in configured.values():
-            configured[stem] = gguf_path.name
-
-    # Resolve GPU layers
-    n_gpu_layers = detect_gpu_layers(settings.gpu_mode)
-    if n_gpu_layers != 0:
-        logger.info("GPU offloading enabled: n_gpu_layers=%d", n_gpu_layers)
-    else:
-        logger.info("Running in CPU-only mode")
-
-    # Register each text model
-    for alias, filename in configured.items():
-        model_path = models_dir / filename
-        if not model_path.exists():
-            logger.warning(
-                "Model file '%s' not found in %s — skipping '%s'",
-                filename,
-                models_dir,
-                alias,
+    for cfg in slm_configs:
+        path = models_dir / cfg["file"]
+        if path.exists():
+            # Calculate GPU layers if available
+            ngl = detect_gpu_layers(path) if gpu_available else 0
+            adapter = LlamaCPPAdapter(
+                model_id=cfg["id"],
+                model_path=str(path),
+                n_ctx=cfg["ctx"],
+                n_threads=cfg["t"],
+                n_gpu_layers=ngl,
             )
-            continue
-
-        # Estimate model size for GPU decision
-        model_size_mb = model_path.stat().st_size / (1024 * 1024)
-
-        # Only register models under 500 MB RAM footprint
-        # (GGUF compressed size is a reasonable proxy)
-        if model_size_mb > 500:
-            logger.warning(
-                "Model '%s' (%.0f MB) exceeds 500 MB limit — skipping",
-                alias,
-                model_size_mb,
+            registry.register(adapter)
+            logger.info(
+                "Registered SLM: %s (ctx: %d, t: %d, ngl: %d)",
+                cfg["id"],
+                cfg["ctx"],
+                cfg["t"],
+                ngl,
             )
-            continue
-
-        adapter = TextModelAdapter(
-            model_id=alias,
-            model_path=model_path,
-            n_ctx=2048,
-            n_gpu_layers=n_gpu_layers,
-        )
-        registry.register(adapter)
-        logger.info(
-            "Registered text model '%s' (%.0f MB, %d GPU layers)",
-            alias,
-            model_size_mb,
-            n_gpu_layers,
-        )
+        else:
+            logger.warning("SLM file missing: %s", path)
 
 
 # ════════════════════════════════════════════════════════════════════════════

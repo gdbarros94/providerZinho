@@ -33,6 +33,7 @@ class HardwareStatus:
     gpu_available: bool
     gpu_memory_free_mb: float | None
     gpu_memory_total_mb: float | None
+    temperature: float | None = None
     timestamp: float = field(default_factory=time.time)
 
     @property
@@ -52,6 +53,7 @@ class HardwareStatus:
             "gpu_memory_total_mb": (
                 round(self.gpu_memory_total_mb, 1) if self.gpu_memory_total_mb is not None else None
             ),
+            "temperature": round(self.temperature, 1) if self.temperature is not None else None,
         }
 
 
@@ -70,6 +72,7 @@ class HardwareMonitor:
 
         # Warm up psutil CPU counter (first call always returns 0.0)
         psutil.cpu_percent(interval=None)
+        self._thermal_provider = get_thermal_provider()
 
     # ── Public API ──────────────────────────────────────────────────────────
 
@@ -77,6 +80,7 @@ class HardwareMonitor:
         """Take a point-in-time reading of device resources."""
         mem = psutil.virtual_memory()
         cpu = psutil.cpu_percent(interval=None)  # non-blocking after warm-up
+        temp = self._thermal_provider.get_temperature()
 
         gpu_avail, gpu_free, gpu_total = self._probe_gpu()
 
@@ -88,6 +92,7 @@ class HardwareMonitor:
             gpu_available=gpu_avail,
             gpu_memory_free_mb=gpu_free,
             gpu_memory_total_mb=gpu_total,
+            temperature=temp,
         )
 
     def check_capacity(self) -> tuple[bool, str]:
