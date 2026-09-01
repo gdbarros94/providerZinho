@@ -83,9 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     registry = get_registry()
     await _register_models(settings, registry, snap.gpu_available)
 
-    # ── Load all registered models ──────────────────────────────────────
-    await registry.load_all()
-    logger.info("Models ready: %s", ", ".join(registry.model_ids) or "(none)")
+    logger.info("Models registered: %s. Lazy loading enabled.", ", ".join(registry.model_ids) or "(none)")
 
     yield
 

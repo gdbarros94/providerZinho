@@ -37,6 +37,7 @@ router = APIRouter(prefix="/v1")
 @router.post("/chat/completions")
 async def chat_completions(
     request: ChatCompletionRequest,
+    app_state: Request,
     _api_key: str | None = Depends(verify_api_key),
     registry: ModelRegistry = Depends(get_registry),
     hw: HardwareMonitor = Depends(get_hardware_monitor),
@@ -58,30 +59,30 @@ async def chat_completions(
         )
 
     try:
-        # 2. Resolve the model adapter
-        adapter = registry.get(request.model)
+        # 2. Pre-process payload (Commands, Compression, Token Count)
+        processor = app_state.app.state.payload_processor
+        static_resp, modified_request = processor.process_request(request)
+        
+        if static_resp:
+            return JSONResponse(content={
+                "choices": [{"message": {"role": "assistant", "content": static_resp}}]
+            })
 
-        # 3. Ensure model is loaded
-        if not adapter.is_loaded:
-            try:
-                await adapter.load()
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail={
-                        "error": {
-                            "message": f"Failed to load model '{request.model}': {exc}",
-                            "type": "server_error",
-                            "code": "model_load_error",
-                        }
-                    },
-                ) from exc
+        token_count = processor.count_tokens(
+            "".join([m.content or "" for m in modified_request.messages])
+        )
+
+        # 3. Route and Activate (Exclusive Swap)
+        router = app_state.app.state.router
+        adapter = await router.route_and_activate(modified_request, token_count)
 
         # 4. Branch on streaming
-        if request.stream:
-            return await _handle_streaming(request, adapter, hw)
+        if modified_request.stream:
+            return await _handle_streaming(modified_request, adapter, hw)
         else:
-            return await _handle_non_streaming(request, adapter)
+            return await _handle_non_streaming(modified_request, adapter)
+
+    except HTTPException:
 
     except HTTPException:
         raise

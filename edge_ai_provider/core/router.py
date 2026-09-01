@@ -28,6 +28,16 @@ class AgenticRouter:
             "tools": "phi-3.5-mini"
         }
 
+    async def route_and_activate(self, request: ChatCompletionRequest, token_count: int) -> BaseModelAdapter:
+        """
+        Determines the best model and ensures it is loaded in RAM.
+        """
+        model_id = self.route(request, token_count)
+        logger.info("Router selected model: %s", model_id)
+        
+        # Exclusive swap: unload others, load target
+        return await self.registry.switch_to_model(model_id)
+
     def route(self, request: ChatCompletionRequest, token_count: int) -> str:
         """
         Determines the best model for the request.
@@ -72,4 +82,3 @@ class AgenticRouter:
         for msg in reversed(request.messages):
             if msg.role == "user" and msg.content:
                 return msg.content
-        return ""

@@ -69,6 +69,27 @@ class ModelRegistry:
             )
         return adapter
 
+    async def switch_to_model(self, model_id: str) -> BaseModelAdapter:
+        """
+        Ensures only one model is loaded in RAM at a time.
+        Unloads current model before loading the target.
+        """
+        target = self.get(model_id)
+
+        # Find currently loaded model
+        current_loaded = next(
+            (a for a in self._adapters.values() if a.is_loaded), None
+        )
+
+        if current_loaded and current_loaded.model_id != model_id:
+            logger.info("Swapping models: %s -> %s", current_loaded.model_id, model_id)
+            await current_loaded.unload()
+
+        if not target.is_loaded:
+            await target.load()
+
+        return target
+
     def has(self, model_id: str) -> bool:
         """Check whether a model is registered."""
         return model_id in self._adapters
